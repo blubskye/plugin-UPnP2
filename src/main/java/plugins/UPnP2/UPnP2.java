@@ -89,7 +89,7 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
     }
 
     private PluginRespirator pr;
-    private UpnpService upnpService = new UpnpServiceImpl();
+    private UpnpService upnpService; // BUG-1: init in runPlugin(), not at field declaration
     /**
      * Store detected External IPs for different services
      */
@@ -104,7 +104,7 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
     private Set<Service> commonServices = new HashSet<>();
     private Map<Service, SubscriptionCallback> subscriptionCallbacks = new HashMap<>();
     private IGDRegistryListener registryListener;
-    private boolean booted = false;
+    private volatile boolean booted = false; // BUG-6: volatile so event thread write is visible
     private Ticker ticker;
     private Set<ForwardPort> ports;
     private ForwardPortCallback cb;
@@ -125,7 +125,8 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
         ticker.removeQueuedJob(portMappingRunnable);
 
         // Release all resources and advertise BYEBYE to other UPnP devices
-        upnpService.shutdown();
+        // BUG-1: null check in case runPlugin() was never called
+        if (upnpService != null) upnpService.shutdown();
 
         Logger.normal(this, "UPnP2 plugin ended");
     }
@@ -138,8 +139,10 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
 
         ticker = pr.getNode().getTicker();
 
-        // This will create necessary network resources for UPnP right away
+        // BUG-1: Initialize upnpService here, not at field declaration, so network
+        // activity starts only after the plugin is properly initialized.
         Logger.normal(this, "Starting Cling...");
+        upnpService = new UpnpServiceImpl();
 
         // Add listeners for upnpService
         registryListener = new IGDRegistryListener();
@@ -291,11 +294,12 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
 
     @Override
     public int getUpstramMaxBitRate() {
-        System.out.println("Calling getUpstramMaxBitRate()");
+        Logger.normal(this, "Calling getUpstramMaxBitRate()");
 
         waitForBooting();
 
-        if (connectionServices.size() < 0 && commonServices.size() < 0) {
+        // BUG-2: size() never returns negative; use == 0 to actually guard the early return
+        if (connectionServices.size() == 0 && commonServices.size() == 0) {
             return -1;
         }
 
@@ -306,18 +310,19 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
             return -1;
         }
 
-        System.out.println("Upstream MaxBitRate: " + rates[0]);
+        Logger.normal(this, "Upstream MaxBitRate: " + rates[0]);
 
         return rates[0];
     }
 
     @Override
     public int getDownstreamMaxBitRate() {
-        System.out.println("Calling getDownstreamMaxBitRate()");
+        Logger.normal(this, "Calling getDownstreamMaxBitRate()");
 
         waitForBooting();
 
-        if (connectionServices.size() < 0 && commonServices.size() < 0) {
+        // BUG-2: size() never returns negative; use == 0 to actually guard the early return
+        if (connectionServices.size() == 0 && commonServices.size() == 0) {
             return -1;
         }
 
@@ -327,7 +332,8 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
             return -1;
         }
 
-        System.out.println("Downstream MaxBitRate: " + rates[0]);
+        // BUG-3: rates[0] is upstream; log rates[1] for downstream
+        Logger.normal(this, "Downstream MaxBitRate: " + rates[1]);
 
         return rates[1];
     }
@@ -385,7 +391,7 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
                 @Override
                 protected void success(String externalIPAddress) {
                     try {
-                        System.out.println("Get external IP: " + externalIPAddress);
+                        Logger.normal(this, "Get external IP: " + externalIPAddress); // SEC-1
 
                         InetAddress inetAddress = InetAddress.getByName
                                 (externalIPAddress);
@@ -567,10 +573,11 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
                 }
                 // Remove Services
                 connectionServices.remove(service);
+                commonServices.remove(service); // BUG-7: commonServices was never cleaned up
             }
 
-            // Clear detected IPs
-            detectedIPs.clear();
+            // BUG-4: clear() wiped IPs for all devices; only remove the one being removed
+            detectedIPs.remove(device.getRoot());
 
         }
 
@@ -719,10 +726,13 @@ public class UPnP2 implements FredPlugin, FredPluginThreadless, FredPluginIPDete
 
             Map values = sub.getCurrentValues();
 
-            System.out.println(values);
+            if (logMINOR) Logger.minor(this, "GENA event values: " + values); // SEC-1
 
             StateVariableValue externalIPAddress =
                     (StateVariableValue) values.get("ExternalIPAddress");
+
+            // BUG-5: non-conforming routers may omit ExternalIPAddress from the event
+            if (externalIPAddress == null) return;
 
             try {
                 InetAddress inetAddress = InetAddress.getByName

@@ -58,3 +58,7 @@ gradle-app.setting
 !gradle-wrapper.jar
 
 libs/
+
+# Local audit/patch docs — not for upstream
+AUDIT*.md
+docs/security/

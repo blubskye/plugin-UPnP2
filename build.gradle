@@ -9,17 +9,17 @@ apply plugin: 'witness'
 apply plugin: 'maven-publish'
 
 compileJava {
-    sourceCompatibility = 1.7
-    targetCompatibility = 1.7
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
 }
 
 version = "0.0.2"
 
 repositories {
     mavenLocal()
-    maven { url "http://4thline.org/m2" }
+    maven { url "http://4thline.org/m2" } // NOTE: server has no TLS; dependencyVerification SHA-256 hashes provide integrity
     maven { url 'https://mvn.freenetproject.org' }
-    jcenter()
+    mavenCentral() // jcenter() was shut down
 }
 
 configurations {
@@ -28,19 +28,19 @@ configurations {
 
 dependencies {
     compile group: 'org.freenetproject', name: 'fred', version: 'build+'
-    extraLibs group: 'org.fourthline.cling', name: 'cling-core', version: '2.1.0'
-    extraLibs group: 'org.fourthline.cling', name: 'cling-support', version: '2.1.0'
+    extraLibs group: 'org.fourthline.cling', name: 'cling-core', version: '2.1.2'
+    extraLibs group: 'org.fourthline.cling', name: 'cling-support', version: '2.1.2'
     configurations.compile.extendsFrom(configurations.extraLibs)
 }
 
 dependencyVerification {
     verify = [
-            'org.fourthline.cling:cling-core:cf556bae1a8526626b139e1a3815a8c960c4c55bf1d24baae143ff8079f326fd',
-            'org.fourthline.cling:cling-support:d090bff05f033f2d0d1da42ba9f367d1155b54af3b44237baddd0faeef5f6a1b',
-            'org.seamless:seamless-util:eb663e3739d67137baab18e65ed2cdec28213a8871458323c3cc62da085cec3c',
-            'org.seamless:seamless-http:05da30fa260cf53770fefbd46482c04f6a37e19b663fec282a4c4384c0def813',
-            'org.seamless:seamless-xml:6d80a97918e4ae91ecb676f9cd056942f1565d981d054a461058a16096464298',
-            'org.seamless:seamless-swing:653fa6fea357f1349075bdd94328fc9c0d285046d7deb25a56dc8a86513b64e0',
+            'org.fourthline.cling:cling-core:cbb92ca0d325fd1e970f10be5204db5ba849564d35d0a2c606ddfc1ed88bfd55',
+            'org.fourthline.cling:cling-support:7ff1bc19ec4e796ab6bef7f8211b1803a556a2cc8298746d45464f50f301c0cb',
+            'org.seamless:seamless-util:ffef187401a3d6c90986386b5ee0953e8ea4e05d96576472b3a8e39fe895f473',
+            'org.seamless:seamless-http:ad8e88690a3de0d682ba05d1aadda393ca0a59eb64d098d15ac76d76d8c60717',
+            'org.seamless:seamless-xml:2cabecefab0628ea0d488ccf2b46a1799d3375073eccbedc227c7bc69dabce32',
+            'org.seamless:seamless-swing:955b9b7d5411d571665f64102168903ba582c60627eb7cd280914c235aef5526',
     ]
 }
 
